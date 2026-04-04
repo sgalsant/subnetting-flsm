@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visualizador FLSM — Subnetting de Longitud Fija</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════
+   TEMA OSCURO — alumno (por defecto)
+══════════════════════════════════════════════ */
+:root,
+[data-theme="dark"] {
+  --bg:         #0d1117;
+  --surface:    #161b22;
+  --surface2:   #1e252f;
+  --border:     #30363d;
+  --text:       #e6edf3;
+  --muted:      #7d8590;
+  --net:        #388bfd;
+  --subnet:     #f78166;
+  --host:       #56d364;
+  --zero:       #484f58;
+  --accent:     #f0883e;
+  --warn:       #e3b341;
+  --net-bg:     rgba(56,139,253,0.15);
+  --subnet-bg:  rgba(247,129,102,0.20);
+  --host-bg:    rgba(86,211,100,0.13);
+  --warn-bg:    rgba(227,179,65,0.12);
+  --zero-bg:    rgba(72,79,88,0.30);
+  --bit-zero-border: #484f58;
+  --err-bg:     rgba(248,81,73,.12);
+  --err-border: rgba(248,81,73,.4);
+  --err-text:   #f85149;
+  --toggle-bg:  #f0c05a;
+  --toggle-ico: "☀️";
+  --toggle-lbl: "Modo proyector";
+}
+
+/* ══════════════════════════════════════════════
+   TEMA CLARO — proyector alto contraste
+══════════════════════════════════════════════ */
+[data-theme="light"] {
+  --bg:         #f5f7fa;
+  --surface:    #ffffff;
+  --surface2:   #eef1f5;
+  --border:     #c8cdd6;
+  --text:       #111827;
+  --muted:      #4b5563;
+  --net:        #1a56db;       /* azul fuerte */
+  --subnet:     #c7280c;       /* rojo intenso */
+  --host:       #166534;       /* verde oscuro */
+  --zero:       #9ca3af;
+  --accent:     #c2410c;
+  --warn:       #92400e;
+  --net-bg:     rgba(26,86,219,0.10);
+  --subnet-bg:  rgba(199,40,12,0.10);
+  --host-bg:    rgba(22,101,52,0.10);
+  --warn-bg:    rgba(146,64,14,0.10);
+  --zero-bg:    rgba(156,163,175,0.20);
+  --bit-zero-border: #9ca3af;
+  --err-bg:     rgba(185,28,28,.08);
+  --err-border: rgba(185,28,28,.4);
+  --err-text:   #b91c1c;
+  --toggle-bg:  #1e293b;
+  --toggle-ico: "🌙";
+  --toggle-lbl: "Modo alumno";
+}
+
+/* ══════════════════════════════════════════════
+   RESET & BASE
+══════════════════════════════════════════════ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Sora', sans-serif;
+  min-height: 100vh;
+  padding: 1.5rem 1rem 4rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  transition: background .25s, color .25s;
+}
+
+/* ── CABECERA ── */
+.topbar {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;
+}
+.topbar-left h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -.02em; margin-bottom: .15rem; }
+.topbar-left .subtitle { font-size: .78rem; color: var(--muted); font-weight: 300; }
+
+/* Botón toggle tema */
+.theme-btn {
+  display: flex; align-items: center; gap: .5rem;
+  background: var(--toggle-bg); color: #fff;
+  border: none; border-radius: 8px;
+  font-family: 'Sora', sans-serif; font-size: .78rem; font-weight: 600;
+  padding: .55rem 1rem; cursor: pointer; white-space: nowrap;
+  transition: background .25s, transform .1s; flex-shrink: 0;
+}
+[data-theme="light"] .theme-btn { color: #fff; }
+.theme-btn:hover { transform: scale(1.03); }
+.theme-btn .theme-icon { font-size: 1rem; }
+.theme-badge {
+  display: inline-block; font-size: .6rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+  background: rgba(255,255,255,.2); border-radius: 4px; padding: 1px 5px;
+}
+
+/* ── CARDS ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+  transition: background .25s, border-color .25s;
+}
+.section-title {
+  font-size: .68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted); margin-bottom: .9rem;
+  display: flex; align-items: center; gap: .5rem;
+}
+.section-title span { color: var(--accent); }
+
+/* ── FORM ── */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1rem; align-items: end;
+}
+label { display: block; font-size: .7rem; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: .35rem; }
+input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text);
+  font-family: 'JetBrains Mono', monospace; font-size: .9rem;
+  padding: .55rem .75rem; outline: none; transition: border-color .2s, background .25s;
+}
+input:focus { border-color: var(--net); }
+.btn-row { display: flex; gap: .6rem; }
+button.btn-calc {
+  background: var(--net); color: #fff; border: none; border-radius: 6px;
+  font-family: 'Sora', sans-serif; font-size: .82rem; font-weight: 600;
+  padding: .6rem 1.2rem; cursor: pointer; transition: opacity .15s; flex: 1;
+}
+button.btn-calc:hover { opacity: .85; }
+button.btn-step {
+  background: var(--surface2); border: 1px solid var(--subnet);
+  color: var(--subnet); border-radius: 6px;
+  font-family: 'Sora', sans-serif; font-size: .82rem; font-weight: 600;
+  padding: .6rem 1.2rem; cursor: pointer; flex: 1; transition: background .15s;
+}
+button.btn-step:hover { background: var(--subnet-bg); }
+.error {
+  background: var(--err-bg); border: 1px solid var(--err-border);
+  border-radius: 6px; color: var(--err-text); font-size: .8rem;
+  padding: .6rem .9rem; margin-top: 1rem; display: none;
+}
+.ip-warn {
+  background: var(--warn-bg); border: 1px solid var(--warn);
+  border-radius: 6px; color: var(--warn); font-size: .8rem;
+  padding: .6rem .9rem; margin-top: .6rem; display: none; line-height: 1.5;
+}
+/* ── PAGINACIÓN TABLA ── */
+.table-pagination {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .75rem; padding: .75rem 0 .25rem; flex-wrap: wrap;
+}
+.pag-btn {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px;
+  font-family: 'Sora', sans-serif; font-size: .75rem; font-weight: 600;
+  padding: .4rem .9rem; cursor: pointer; transition: background .15s; flex: none; width: auto;
+}
+.pag-btn:hover:not([disabled]) { background: var(--net-bg); border-color: var(--net); color: var(--net); }
+.pag-btn[disabled] { opacity: .35; cursor: default; }
+.pag-info { font-size: .72rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+/* ── FÓRMULAS ── */
+.formulas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: .75rem; margin-bottom: 1.25rem;
+}
+.formula-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: .8rem 1rem;
+  transition: background .25s, border-color .25s;
+}
+.formula-box .f-expr {
+  font-family: 'JetBrains Mono', monospace; font-size: .95rem;
+  font-weight: 700; margin-bottom: .3rem;
+}
+[data-theme="light"] .formula-box .f-expr { font-size: 1.05rem; }
+.formula-box .f-desc { font-size: .7rem; color: var(--muted); line-height: 1.45; }
+
+/* ── RAZONAMIENTO 2^n ── */
+.reasoning-card {
+  background: var(--surface2); border: 1px solid var(--subnet);
+  border-radius: 8px; padding: 1rem 1.2rem; margin-bottom: 1rem;
+  transition: background .25s;
+}
+.reasoning-title {
+  font-size: .7rem; font-weight: 700; color: var(--subnet);
+  text-transform: uppercase; letter-spacing: .08em; margin-bottom: .7rem;
+}
+.pow-table { display: flex; flex-wrap: wrap; gap: .45rem; margin-bottom: .75rem; }
+.pow-cell {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: .4rem .65rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .72rem; text-align: center; min-width: 80px;
+  transition: background .25s, border-color .25s;
+}
+.pow-cell .pow-label { color: var(--muted); font-size: .6rem; display: block; margin-bottom: 2px; }
+.pow-cell .pow-val   { font-weight: 700; font-size: .88rem; }
+.pow-cell .pow-status{ font-size: .58rem; display: block; margin-top: 2px; }
+.pow-cell.chosen  { border-color: var(--subnet); background: var(--subnet-bg); }
+.pow-cell.chosen .pow-val, .pow-cell.chosen .pow-status { color: var(--subnet); }
+.pow-cell.smaller .pow-val, .pow-cell.smaller .pow-status { color: var(--zero); }
+.pow-cell.valid   .pow-val, .pow-cell.valid   .pow-status { color: var(--muted); }
+.reasoning-text { font-size: .78rem; color: var(--text); line-height: 1.65; }
+.reasoning-text strong { color: var(--subnet); }
+[data-theme="light"] .reasoning-text { font-size: .82rem; }
+
+/* ── DISTANCIA ── */
+.distance-card {
+  background: var(--surface2); border: 1px solid var(--host);
+  border-radius: 8px; padding: 1rem 1.2rem; margin-bottom: 1rem;
+  transition: background .25s;
+}
+.distance-title {
+  font-size: .7rem; font-weight: 700; color: var(--host);
+  text-transform: uppercase; letter-spacing: .08em; margin-bottom: .6rem;
+}
+.dist-formula {
+  font-family: 'JetBrains Mono', monospace; font-size: .92rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: .5rem .85rem; margin-bottom: .55rem; display: inline-block;
+  transition: background .25s;
+}
+[data-theme="light"] .dist-formula { font-size: 1rem; font-weight: 600; }
+.dist-result { font-size: .78rem; color: var(--text); line-height: 1.65; }
+.dist-result strong { color: var(--host); }
+[data-theme="light"] .dist-result { font-size: .82rem; }
+
+/* ── OCTETO ── */
+.octeto-card {
+  background: var(--surface2); border: 1px solid var(--warn);
+  border-radius: 8px; padding: 1rem 1.2rem;
+  transition: background .25s;
+}
+.octeto-title {
+  font-size: .7rem; font-weight: 700; color: var(--warn);
+  text-transform: uppercase; letter-spacing: .08em; margin-bottom: .6rem;
+}
+.octeto-row {
+  display: flex; gap: .35rem; align-items: center; flex-wrap: wrap;
+  font-family: 'JetBrains Mono', monospace; font-size: .85rem; margin-bottom: .55rem;
+}
+.oct-block {
+  padding: .35rem .65rem; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface);
+  text-align: center; min-width: 65px;
+  transition: background .25s, border-color .25s;
+}
+.oct-block.relevant { border-color: var(--warn); background: var(--warn-bg); color: var(--warn); font-weight: 700; }
+.oct-label { font-size: .58rem; color: inherit; opacity: .75; display: block; margin-top: 1px; }
+.oct-dot { color: var(--muted); font-weight: 300; }
+.octeto-text { font-size: .78rem; color: var(--text); line-height: 1.65; }
+.octeto-text strong { color: var(--warn); }
+[data-theme="light"] .octeto-text { font-size: .82rem; }
+
+/* ── LEYENDA ── */
+.legend {
+  display: flex; flex-wrap: wrap; gap: .5rem 1.2rem;
+  font-size: .72rem; margin-bottom: 1rem;
+}
+.legend-item { display: flex; align-items: center; gap: .3rem; }
+.legend-dot { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+
+/* ── BITS ── */
+.bit-row { display: flex; align-items: center; gap: .35rem; margin-bottom: .55rem; }
+.bit-row-label {
+  font-size: .68rem; color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  min-width: 110px; text-align: right; flex-shrink: 0;
+}
+[data-theme="light"] .bit-row-label { font-size: .72rem; min-width: 118px; }
+.bits-wrapper { display: flex; gap: 2px; overflow-x: auto; padding-bottom: 2px; }
+.bit {
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace; font-size: .78rem; font-weight: 700;
+  border-radius: 4px; flex-shrink: 0;
+  transition: background .25s, color .25s, border-color .25s;
+}
+[data-theme="light"] .bit { width: 24px; height: 24px; font-size: .82rem; border-width: 2px; }
+.bit.net    { background: var(--net-bg);    color: var(--net);    border: 1px solid var(--net); }
+.bit.subnet { background: var(--subnet-bg); color: var(--subnet); border: 1px solid var(--subnet); }
+.bit.host   { background: var(--host-bg);   color: var(--host);   border: 1px solid var(--host); }
+.bit.zero   { background: var(--zero-bg);   color: var(--zero);   border: 1px solid var(--bit-zero-border); }
+.bit.spacer { background: transparent; border: none; width: 8px; }
+
+.zone-labels {
+  display: flex; gap: 2px;
+  margin-left: calc(110px + .35rem);
+  margin-bottom: .25rem;
+  font-size: .58rem; font-family: 'JetBrains Mono', monospace;
+  overflow-x: auto; padding-bottom: 1px;
+}
+[data-theme="light"] .zone-labels { margin-left: calc(118px + .35rem); font-size: .62rem; font-weight: 700; }
+.zone-label-block {
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 3px; padding: 2px 0; font-weight: 700;
+  letter-spacing: .04em; white-space: nowrap; overflow: hidden; flex-shrink: 0;
+}
+
+/* ── INFO BOXES ── */
+.info-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: .65rem; margin-top: 1.2rem;
+}
+.info-box {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: .7rem .9rem;
+  transition: background .25s, border-color .25s;
+}
+.info-box .val {
+  font-size: 1.2rem; font-weight: 700;
+  font-family: 'JetBrains Mono', monospace; line-height: 1.1;
+}
+[data-theme="light"] .info-box .val { font-size: 1.3rem; }
+.info-box .lbl { font-size: .63rem; color: var(--muted); margin-top: .2rem;
+  text-transform: uppercase; letter-spacing: .05em; }
+
+/* ── TABLA ── */
+.table-wrapper { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .77rem; min-width: 720px; }
+thead th {
+  background: var(--surface2); color: var(--muted);
+  font-family: 'Sora', sans-serif; font-size: .62rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .06em;
+  padding: .6rem .75rem; text-align: left;
+  border-bottom: 2px solid var(--border); white-space: nowrap;
+  transition: background .25s;
+}
+[data-theme="light"] thead th { font-size: .68rem; border-bottom-width: 2px; }
+tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; cursor: default; }
+tbody tr:hover { background: var(--subnet-bg); }
+tbody td { padding: .5rem .75rem; font-family: 'JetBrains Mono', monospace; vertical-align: middle; }
+[data-theme="light"] tbody td { font-size: .82rem; padding: .6rem .85rem; }
+.td-index { color: var(--muted); font-size: .7rem; text-align: center; width: 32px; }
+.td-dec { color: var(--text); }
+.tbit {
+  display: inline-block; width: 14px; height: 14px; line-height: 14px;
+  text-align: center; font-size: .62rem; font-weight: 700;
+  border-radius: 2px; margin: 0 .5px; transition: all .15s;
+}
+[data-theme="light"] .tbit { width: 16px; height: 16px; line-height: 16px; font-size: .68rem; border-width: 2px; }
+.tbit.net    { background: var(--net-bg);    color: var(--net); }
+.tbit.subnet { background: rgba(0,0,0,.04);  color: var(--muted); border: 1px solid transparent; }
+[data-theme="light"] .tbit.subnet { background: rgba(0,0,0,.04); color: #aaa; }
+.tbit.host   { background: var(--host-bg);   color: var(--host); }
+.tbit.spacer { background: transparent; width: 5px; }
+.tbit.subnet.lit {
+  background: var(--subnet-bg) !important; color: var(--subnet) !important;
+  border: 1px solid var(--subnet) !important; transform: scale(1.2);
+}
+
+/* ── PASO A PASO ── */
+.step-nav-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 1rem 1.5rem; margin-bottom: 1.25rem; display: none;
+  transition: background .25s, border-color .25s;
+}
+.step-dots { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; margin-bottom: .9rem; }
+.step-dot {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .7rem; font-weight: 700; border: 2px solid var(--border);
+  color: var(--muted); background: var(--surface2); cursor: pointer; transition: all .2s;
+}
+.step-dot.active { border-color: var(--accent); color: var(--accent); background: var(--warn-bg); }
+.step-dot.done   { border-color: var(--host);   color: var(--host);   background: var(--host-bg); }
+.step-line { flex: 1; height: 1px; background: var(--border); max-width: 48px; }
+.step-lbl { font-size: .62rem; color: var(--muted); }
+.step-btns { display: flex; gap: .6rem; }
+.step-btns button { padding: .5rem 1.2rem; }
+.step-btns .btn-prev {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--muted); border-radius: 6px;
+  font-family: 'Sora', sans-serif; font-size: .82rem; font-weight: 600; cursor: pointer;
+}
+
+.step-section { display: none; }
+.step-section.vis { display: block; animation: fadein .28s ease; }
+@keyframes fadein { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
+
+#output { display: none; }
+
+/* ── BOTÓN FLOTANTE SIGUIENTE ── */
+.fab-next {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 999;
+  display: none; /* solo visible en modo paso a paso */
+  align-items: center;
+  gap: .5rem;
+  background: var(--subnet);
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  font-family: 'Sora', sans-serif;
+  font-size: .85rem;
+  font-weight: 700;
+  padding: .75rem 1.4rem;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0,0,0,.35);
+  transition: transform .15s, box-shadow .15s, background .25s;
+}
+.fab-next:hover { transform: scale(1.06); box-shadow: 0 6px 28px rgba(0,0,0,.45); }
+.fab-next:active { transform: scale(.97); }
+[data-theme="light"] .fab-next { box-shadow: 0 4px 18px rgba(199,40,12,.3); }
+.fab-next .fab-arrow { font-size: 1.1rem; }
+.fab-step-info {
+  font-size: .65rem; font-weight: 400; opacity: .85;
+  display: block; line-height: 1;
+}
+
+::-webkit-scrollbar { height: 4px; width: 4px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- CABECERA -->
+<div class="topbar">
+  <div class="topbar-left">
+    <h1>Visualizador FLSM</h1>
+    <p class="subtitle">Subnetting de Longitud Fija — Razonamiento paso a paso con binario</p>
+  </div>
+  <button class="theme-btn" onclick="toggleTheme()" id="theme-btn" title="Cambiar tema">
+    <span class="theme-icon" id="theme-icon">☀️</span>
+    <span id="theme-label">Modo proyector</span>
+    <span class="theme-badge" id="theme-badge">DARK</span>
+  </button>
+</div>
+
+<!-- FÓRMULAS SIEMPRE VISIBLES -->
+<div class="formulas">
+  <div class="formula-box">
+    <div class="f-expr" style="color:var(--subnet)">2<sup>n</sup> ≥ subredes necesarias</div>
+    <div class="f-desc">n = bits prestados del campo de host.<br>Elegir el <em>n mínimo</em> que cumpla la condición.</div>
+  </div>
+  <div class="formula-box">
+    <div class="f-expr" style="color:var(--host)">Hosts útiles = 2<sup>h</sup> − 2</div>
+    <div class="f-desc">h = bits de host restantes.<br>Se restan 2: dir. de red y broadcast.</div>
+  </div>
+  <div class="formula-box">
+    <div class="f-expr" style="color:var(--warn)">Bloque = 256 − máscara<sub>oct</sub></div>
+    <div class="f-desc">Distancia entre subredes en el octeto relevante.<br>Equivale a 2<sup>h</sup> cuando el corte cae en ese octeto.</div>
+  </div>
+</div>
+
+<!-- FORMULARIO -->
+<div class="card">
+  <div class="form-grid">
+    <div>
+      <label>Dirección IP inicial</label>
+      <input type="text" id="ip" value="192.168.10.0" placeholder="p.ej. 192.168.10.0">
+    </div>
+    <div>
+      <label>Prefijo / Máscara</label>
+      <input type="text" id="mask" value="24" placeholder="p.ej. 24 ó 255.255.255.0">
+    </div>
+    <div>
+      <label>N.º de subredes necesarias</label>
+      <input type="number" id="subnets" value="4" min="1" max="512">
+    </div>
+    <div>
+      <div class="btn-row">
+        <button class="btn-calc" onclick="calcular()">Calcular</button>
+        <button class="btn-step" id="btn-step-toggle" onclick="toggleStep()">📽 Paso a paso</button>
+      </div>
+    </div>
+  </div>
+  <div class="error" id="error"></div>
+  <div class="ip-warn" id="ip-warn"></div>
+</div>
+
+<!-- RESULTADO -->
+<div id="output">
+
+  <!-- CONTROL PASO A PASO -->
+  <div class="step-nav-card" id="step-nav">
+    <div class="step-dots" id="step-dots"></div>
+    <div class="step-btns">
+      <button class="btn-prev" onclick="prevStep()">← Anterior</button>
+      <button class="btn-calc" onclick="nextStep()" id="btn-next">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 1: Razonamiento 2^n + distancia + octeto -->
+  <div class="step-section" id="sec0">
+    <div class="card">
+      <div class="section-title"><span>①</span> ¿Cuántos bits necesitamos tomar? — Regla 2<sup>n</sup></div>
+      <div class="reasoning-card">
+        <div class="reasoning-title">🔢 Buscamos el n mínimo tal que 2<sup>n</sup> ≥ subredes necesarias</div>
+        <div class="pow-table" id="pow-table"></div>
+        <div class="reasoning-text" id="reasoning-text"></div>
+      </div>
+      <div class="distance-card">
+        <div class="distance-title">📏 Distancia entre subredes (tamaño de bloque)</div>
+        <div class="dist-formula" id="dist-formula"></div>
+        <div class="dist-result" id="dist-result"></div>
+      </div>
+      <div class="octeto-card">
+        <div class="octeto-title">🎯 Octeto relevante — donde se aplica la nueva máscara</div>
+        <div class="octeto-row" id="octeto-row"></div>
+        <div class="octeto-text" id="octeto-text"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 2: Diagrama binario -->
+  <div class="step-section" id="sec1">
+    <div class="card">
+      <div class="section-title"><span>②</span> Dirección inicial en binario — distribución de bits</div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--net);border:1px solid var(--net)"></div><span>Bits de red (máscara original)</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--subnet-bg);border:1px solid var(--subnet)"></div><span>Bits tomados para subredes</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--host-bg);border:1px solid var(--host)"></div><span>Bits de host libres</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--zero-bg);border:1px solid var(--bit-zero-border)"></div><span>Bits de host → 0 (dir. de red)</span></div>
+      </div>
+      <div id="bit-display"></div>
+      <div class="info-grid" id="info-boxes"></div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 3: Tabla -->
+  <div class="step-section" id="sec2">
+    <div class="card">
+      <div class="section-title"><span>③</span> Tabla de subredes — binario y decimal</div>
+      <p style="font-size:.72rem;color:var(--muted);margin-bottom:.8rem">
+        💡 Pasa el cursor sobre una fila para resaltar los bits de subnetting.
+      </p>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Dir. de red</th>
+              <th>Primer host</th>
+              <th>Último host</th>
+              <th>Broadcast</th>
+              <th>Dir. de red (binario)</th>
+            </tr>
+          </thead>
+          <tbody id="subnet-table"></tbody>
+        </table>
+      </div>
+      <div class="table-pagination" id="table-pagination" style="display:none"></div>
+    </div>
+  </div>
+
+</div><!-- /output -->
+
+<!-- BOTÓN FLOTANTE SIGUIENTE (solo en modo paso a paso) -->
+<button class="fab-next" id="fab-next" onclick="nextStep()">
+  <span>
+    <span id="fab-label">Siguiente</span>
+    <span class="fab-step-info" id="fab-info">paso 1 de 3</span>
+  </span>
+  <span class="fab-arrow">→</span>
+</button>
+
+<script>
+// ── Estado ───────────────────────────────────────────────────────────────────
+let stepMode = false, curStep = 0;
+const SECS  = ['sec0','sec1','sec2'];
+const LBLS  = ['Bits necesarios','Diagrama binario','Tabla de subredes'];
+
+// ── Tema ─────────────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('theme-icon').textContent  = isDark ? '🌙' : '☀️';
+  document.getElementById('theme-label').textContent = isDark ? 'Modo alumno' : 'Modo proyector';
+  document.getElementById('theme-badge').textContent = isDark ? 'LIGHT' : 'DARK';
+  document.querySelector('.theme-btn').style.background = isDark ? '#1e293b' : '#f0c05a';
+  // FIX 1: recalcular diagrama de bits con el nuevo tamaño de bit
+  if (window._lastRenderArgs) renderBits(...window._lastRenderArgs);
+}
+
+// ── Utilidades IP ─────────────────────────────────────────────────────────────
+const ipToInt = ip => {
+  const p = ip.trim().split('.');
+  if (p.length !== 4) return null;
+  const n = p.map(Number);
+  if (n.some(x => isNaN(x)||x<0||x>255)) return null;
+  return (n[0]<<24|n[1]<<16|n[2]<<8|n[3])>>>0;
+};
+const intToIp = n => [(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255].join('.');
+const toBin32 = n => ((n>>>0).toString(2)).padStart(32,'0');
+const ceilLog2 = n => { let b=0; while((1<<b)<n) b++; return b; };
+const parseMask = val => {
+  val = val.trim();
+  if (/^\d+$/.test(val)) { const n=parseInt(val); return n>=0&&n<=32?n:null; }
+  const int=ipToInt(val); if(int===null) return null;
+  const bin=int.toString(2).padStart(32,'0');
+  if(!/^1*0*$/.test(bin)) return null;
+  return bin.split('').filter(b=>b==='1').length;
+};
+
+// ── Paso a paso ───────────────────────────────────────────────────────────────
+function toggleStep() {
+  stepMode = !stepMode;
+  const nav=document.getElementById('step-nav');
+  const btn=document.getElementById('btn-step-toggle');
+  const fab=document.getElementById('fab-next');
+  if (stepMode) {
+    nav.style.display='block'; curStep=0;
+    btn.textContent='✕ Ver todo';
+    fab.style.display='flex';
+    buildDots(); showStep(0);
+  } else {
+    nav.style.display='none';
+    btn.textContent='📽 Paso a paso';
+    fab.style.display='none';
+    SECS.forEach(id=>document.getElementById(id).classList.add('vis'));
+  }
+}
+function buildDots() {
+  const c=document.getElementById('step-dots'); c.innerHTML='';
+  SECS.forEach((id,i)=>{
+    const d=document.createElement('div');
+    d.className='step-dot'; d.textContent=i+1; d.onclick=()=>showStep(i);
+    c.appendChild(d);
+    if(i<SECS.length-1){
+      const l=document.createElement('div'); l.className='step-line'; c.appendChild(l);
+      const s=document.createElement('div'); s.className='step-lbl'; s.textContent=LBLS[i]; c.appendChild(s);
+    }
+  });
+}
+function showStep(n) {
+  curStep=n;
+  SECS.forEach((id,i)=>document.getElementById(id).classList.toggle('vis',i<=n));
+  document.querySelectorAll('.step-dot').forEach((d,i)=>{
+    d.className='step-dot'+(i<n?' done':i===n?' active':'');
+  });
+  const isLast = n >= SECS.length-1;
+  document.getElementById('btn-next').textContent = isLast ? '✓ Mostrar todo' : 'Siguiente →';
+  const fab=document.getElementById('fab-next');
+  const fabLabel=document.getElementById('fab-label');
+  const fabInfo=document.getElementById('fab-info');
+  if(isLast){
+    fabLabel.textContent='Ver todo';
+    fab.style.background='var(--host)';
+  } else {
+    fabLabel.textContent='Siguiente';
+    fab.style.background='var(--subnet)';
+  }
+  fabInfo.textContent='paso '+(n+1)+' de '+SECS.length+(isLast?' · último':'');
+  // FIX 5: scroll automático a la nueva sección revelada
+  if(n>0){
+    setTimeout(()=>{
+      const el=document.getElementById(SECS[n]);
+      if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+    }, 80);
+  }
+}
+function nextStep() {
+  if(curStep<SECS.length-1) showStep(curStep+1);
+  else { stepMode=false; toggleStep(); }
+}
+function prevStep() { if(curStep>0) showStep(curStep-1); }
+
+// ── Render: Razonamiento 2^n ──────────────────────────────────────────────────
+function renderRazon(nSub,bits,numSub,hosts,newPfx,pfx) {
+  const pt=document.getElementById('pow-table'); pt.innerHTML='';
+  const maxN=Math.max(bits+2,5);
+  for(let n=1;n<=maxN;n++){
+    const v=1<<n;
+    const c=document.createElement('div');
+    c.className='pow-cell'+(n===bits?' chosen':v<nSub?' smaller':' valid');
+    c.innerHTML=`<span class="pow-label">n = ${n}</span>
+      <span class="pow-val">2<sup>${n}</sup> = ${v}</span>
+      <span class="pow-status">${v<nSub?'✗ '+v+' < '+nSub:n===bits?'✓ elegido':'≥ válido'}</span>`;
+    pt.appendChild(c);
+  }
+  document.getElementById('reasoning-text').innerHTML=
+    `Necesitamos <strong>${nSub}</strong> subredes. El mínimo n que cumple 2<sup>n</sup> ≥ ${nSub} es
+    <strong>n = ${bits}</strong>, que produce 2<sup>${bits}</sup> = <strong>${numSub} subredes</strong>
+    ${numSub>nSub?'('+( numSub-nSub)+' sin asignar)':'(exactas)'}.
+    Bits de host restantes: 32 − ${pfx} − ${bits} = <strong>${32-newPfx}</strong>
+    → <strong>${hosts} hosts útiles</strong> por subred (2<sup>${32-newPfx}</sup> − 2).`;
+}
+
+// ── Render: Distancia ─────────────────────────────────────────────────────────
+function renderDist(newPfx,blockSize) {
+  const relOct=Math.ceil(newPfx/8);
+  const bitsEnOct=newPfx-(relOct-1)*8;
+  const maskOctVal=256-(1<<(8-bitsEnOct));
+  document.getElementById('dist-formula').innerHTML=
+    `Bloque = 256 − ${maskOctVal} = <strong style="color:var(--host)">${blockSize}</strong>`;
+  document.getElementById('dist-result').innerHTML=
+    `La nueva máscara <strong>/${newPfx}</strong> vale <strong>${maskOctVal}</strong> en el octeto ${relOct}.
+    Fórmula: 256 − ${maskOctVal} = <strong>${blockSize}</strong>.
+    Cada subred empieza <strong>${blockSize} posiciones</strong> después de la anterior
+    ${blockSize<=256?'en el octeto '+relOct:'(bloque abarca varios octetos)'}.`;
+}
+
+// ── Render: Octeto relevante ──────────────────────────────────────────────────
+function renderOcteto(baseInt,newPfx,blockSize) {
+  const relOct=Math.ceil(newPfx/8);
+  const maskParts=intToIp((0xFFFFFFFF<<(32-newPfx))>>>0).split('.');
+  const baseParts=intToIp(baseInt).split('.');
+  const row=document.getElementById('octeto-row'); row.innerHTML='';
+  for(let i=0;i<4;i++){
+    if(i>0){const d=document.createElement('span');d.className='oct-dot';d.textContent='.';row.appendChild(d);}
+    const b=document.createElement('div');
+    b.className='oct-block'+(i+1===relOct?' relevant':'');
+    b.innerHTML=`<span style="font-weight:700;font-size:.95rem">${baseParts[i]}</span>
+      <span class="oct-label">oct.${i+1} · m: ${maskParts[i]}</span>`;
+    row.appendChild(b);
+  }
+  const bitsEnOct=newPfx-(relOct-1)*8;
+  document.getElementById('octeto-text').innerHTML=
+    `La máscara <strong>/${newPfx}</strong> corta en el <strong>octeto ${relOct}</strong>
+    (${bitsEnOct} bit${bitsEnOct>1?'s':''} → valor <strong>${maskParts[relOct-1]}</strong>).
+    Aquí aplicamos <strong>256 − ${maskParts[relOct-1]} = ${blockSize<=256?blockSize:'ver bloque'}</strong>
+    para obtener la distancia entre subredes.`;
+}
+
+// ── Render: Bits ──────────────────────────────────────────────────────────────
+function renderBits(ipInt,pfx,sbits) {
+  // FIX 1: guardar args para recalcular al cambiar tema
+  window._lastRenderArgs = [ipInt, pfx, sbits];
+
+  const c=document.getElementById('bit-display'); c.innerHTML='';
+  const types=[];
+  for(let i=0;i<32;i++) types.push(i<pfx?'net':i<pfx+sbits?'subnet':'host');
+
+  // etiquetas de zona — ancho dinámico según tema
+  const zr=document.createElement('div'); zr.className='zone-labels';
+  const zones=[]; let cur={type:types[0],start:0,count:0};
+  for(let i=0;i<32;i++){
+    if(types[i]===cur.type) cur.count++;
+    else { zones.push({...cur}); cur={type:types[i],start:i,count:1}; }
+  }
+  zones.push(cur);
+  const bw=document.documentElement.getAttribute('data-theme')==='light'?24:22, gap=2, sw=8;
+  zones.forEach(z=>{
+    const lbl=document.createElement('div'); lbl.className='zone-label-block';
+    let w=z.count*bw+(z.count-1)*gap;
+    for(let sep=8;sep<32;sep+=8) if(sep>z.start&&sep<=z.start+z.count-1) w+=sw+gap;
+    lbl.style.width=w+'px';
+    const cols={net:'var(--net)',subnet:'var(--subnet)',host:'var(--host)'};
+    const lbs={net:'RED',subnet:'SUBRED',host:'HOST'};
+    lbl.style.color=cols[z.type]; lbl.style.border='2px solid '+cols[z.type];
+    lbl.style.background=z.type==='net'?'var(--net-bg)':z.type==='subnet'?'var(--subnet-bg)':'var(--host-bg)';
+    lbl.textContent=z.count>=4?lbs[z.type]+' ('+z.count+' bits)':z.count>=2?z.count:'';
+    zr.appendChild(lbl);
+  });
+
+  const maskInt=(pfx+sbits>0?(0xFFFFFFFF<<(32-pfx-sbits))>>>0:0xFFFFFFFF>>>0);
+  const netAddr=(ipInt&maskInt)>>>0;
+  const rows=[
+    {label:'Dir. inicial',    bits:toBin32(ipInt),  hostZero:false},
+    {label:'Nueva máscara',   bits:'1'.repeat(pfx+sbits).padEnd(32,'0'), isMask:true},
+    {label:'Dir. red (sub 0)',bits:toBin32(netAddr), hostZero:true},
+  ];
+  c.appendChild(zr);
+  rows.forEach(row=>{
+    const wrap=document.createElement('div'); wrap.className='bit-row';
+    const l=document.createElement('div'); l.className='bit-row-label'; l.textContent=row.label;
+    wrap.appendChild(l);
+    const bw2=document.createElement('div'); bw2.className='bits-wrapper';
+    for(let i=0;i<32;i++){
+      if(i>0&&i%8===0){const sp=document.createElement('div');sp.className='bit spacer';bw2.appendChild(sp);}
+      const b=document.createElement('div'); b.className='bit';
+      if(row.isMask)        b.classList.add(i<pfx+sbits?'net':'zero');
+      else if(row.hostZero) b.classList.add(types[i]==='host'?'zero':types[i]);
+      else                  b.classList.add(types[i]);
+      b.textContent=row.bits[i];
+      bw2.appendChild(b);
+    }
+    wrap.appendChild(bw2);
+    c.appendChild(wrap);
+  });
+}
+
+// ── Render: Info boxes ────────────────────────────────────────────────────────
+function renderInfo(pfx,sbits,numSub,hosts,newPfx,blockSize) {
+  document.getElementById('info-boxes').innerHTML=[
+    {v:'/'+pfx,                 l:'Prefijo original'},
+    {v:sbits+' bits',           l:'Bits tomados (n)',      c:'var(--subnet)'},
+    {v:'2^'+sbits+' = '+numSub, l:'Subredes reales'},
+    {v:hosts,                   l:'Hosts útiles / subred', c:'var(--host)'},
+    {v:'/'+newPfx,              l:'Nueva máscara CIDR'},
+    {v:blockSize,               l:'Tamaño de bloque',      c:'var(--warn)'},
+  ].map(d=>`<div class="info-box">
+    <div class="val" style="${d.c?'color:'+d.c:''}">${d.v}</div>
+    <div class="lbl">${d.l}</div></div>`).join('');
+}
+
+// ── Render: Tabla con paginación ──────────────────────────────────────────────
+const TABLE_PAGE = 16; // filas por página
+let tablePage = 0, tableData = null;
+
+function renderTable(baseInt,pfx,sbits,numSub) {
+  const newPfx=pfx+sbits, bs=1<<(32-newPfx);
+  const types=[];
+  for(let i=0;i<32;i++) types.push(i<pfx?'net':i<pfx+sbits?'subnet':'host');
+
+  // FIX 3: guardar datos para paginación
+  tableData = {baseInt,pfx,sbits,numSub,newPfx,bs,types};
+  tablePage = 0;
+  renderTablePage();
+}
+
+function renderTablePage() {
+  const {baseInt,pfx,sbits,numSub,newPfx,bs,types} = tableData;
+  const tbody=document.getElementById('subnet-table'); tbody.innerHTML='';
+  const pagCtrl=document.getElementById('table-pagination');
+
+  const start = tablePage * TABLE_PAGE;
+  const end   = Math.min(start + TABLE_PAGE, numSub);
+
+  for(let s=start;s<end;s++){
+    const net=(baseInt+s*bs)>>>0, bc=(net+bs-1)>>>0;
+    const first=bs>2?(net+1)>>>0:net, last=bs>2?(bc-1)>>>0:bc;
+    const bin=toBin32(net);
+    let bhtml='';
+    for(let i=0;i<32;i++){
+      if(i>0&&i%8===0) bhtml+='<span class="tbit spacer"></span>';
+      bhtml+=`<span class="tbit ${types[i]}">${bin[i]}</span>`;
+    }
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="td-index">${s}</td>
+      <td class="td-dec">${intToIp(net)}</td>
+      <td class="td-dec">${bs>2?intToIp(first):'—'}</td>
+      <td class="td-dec">${bs>2?intToIp(last):'—'}</td>
+      <td class="td-dec">${intToIp(bc)}</td>
+      <td style="white-space:nowrap">${bhtml}</td>`;
+
+    // FIX 4: soporte táctil — toggle al tocar, hover en escritorio
+    let touched = false;
+    const highlight = on => tr.querySelectorAll('.tbit.subnet').forEach(b=>b.classList.toggle('lit',on));
+    tr.addEventListener('mouseenter', ()=>{ if(!touched) highlight(true);  });
+    tr.addEventListener('mouseleave', ()=>{ if(!touched) highlight(false); });
+    tr.addEventListener('touchstart', e=>{
+      touched=true;
+      const wasLit = tr.querySelector('.tbit.subnet.lit');
+      highlight(!wasLit); e.preventDefault();
+    }, {passive:false});
+
+    tbody.appendChild(tr);
+  }
+
+  // control de paginación
+  if(numSub > TABLE_PAGE){
+    const totalPages = Math.ceil(numSub/TABLE_PAGE);
+    pagCtrl.style.display='flex';
+    pagCtrl.innerHTML=`
+      <button class="pag-btn" onclick="changePage(-1)" ${tablePage===0?'disabled':''}>← Anterior</button>
+      <span class="pag-info">Subredes ${start}–${end-1} de ${numSub} &nbsp;·&nbsp; Página ${tablePage+1}/${totalPages}</span>
+      <button class="pag-btn" onclick="changePage(1)"  ${end>=numSub?'disabled':''}>Siguiente →</button>`;
+  } else {
+    pagCtrl.style.display='none';
+  }
+}
+
+function changePage(dir){
+  const total=Math.ceil(tableData.numSub/TABLE_PAGE);
+  tablePage=Math.max(0,Math.min(total-1,tablePage+dir));
+  renderTablePage();
+  document.getElementById('sec2').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+function calcular() {
+  document.getElementById('error').style.display='none';
+  document.getElementById('ip-warn').style.display='none';
+  document.getElementById('output').style.display='none';
+
+  const ipStr  = document.getElementById('ip').value;
+  const maskStr= document.getElementById('mask').value;
+  const nSub   = parseInt(document.getElementById('subnets').value);
+
+  const ipInt=ipToInt(ipStr);
+  if(ipInt===null){showErr('Dirección IP no válida.');return;}
+  const pfx=parseMask(maskStr);
+  if(pfx===null){showErr('Máscara no válida. Usa prefijo (p.ej. 24) o notación decimal.');return;}
+  if(isNaN(nSub)||nSub<1){showErr('Indica al menos 1 subred.');return;}
+
+  const sbits=ceilLog2(nSub);
+  if(pfx+sbits>30){showErr('No hay suficientes bits de host para '+nSub+' subredes con esta máscara.');return;}
+
+  const numSub=1<<sbits, newPfx=pfx+sbits;
+  const hosts=(1<<(32-newPfx))-2;
+  const origMaskInt=(0xFFFFFFFF<<(32-pfx))>>>0;
+  const baseInt=(ipInt&origMaskInt)>>>0;
+  const blockSize=1<<(32-newPfx);
+
+  // FIX 2: avisar si la IP introducida no es dirección de red
+  if(baseInt !== ipInt){
+    const warn=document.getElementById('ip-warn');
+    warn.innerHTML=`⚠️ <strong>${ipStr}</strong> es una dirección de host, no de red.
+      Se usará automáticamente la dirección de red: <strong>${intToIp(baseInt)}</strong>.`;
+    warn.style.display='block';
+  }
+
+  renderRazon(nSub,sbits,numSub,hosts,newPfx,pfx);
+  renderDist(newPfx,blockSize);
+  renderOcteto(baseInt,newPfx,blockSize);
+  renderBits(baseInt,pfx,sbits);
+  renderInfo(pfx,sbits,numSub,hosts,newPfx,blockSize);
+  renderTable(baseInt,pfx,sbits,numSub);
+
+  SECS.forEach(id=>document.getElementById(id).classList.add('vis'));
+  document.getElementById('output').style.display='block';
+
+  if(stepMode){ buildDots(); showStep(curStep); }
+  else document.getElementById('output').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function showErr(m){const e=document.getElementById('error');e.textContent=m;e.style.display='block';}
+
+document.querySelectorAll('input').forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter')calcular();}));
+window.addEventListener('load',calcular);
+</script>
+</body>
+</html>
