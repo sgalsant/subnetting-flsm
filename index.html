@@ -704,17 +704,19 @@ function renderRazon(nSub,bits,numSub,hosts,newPfx,pfx) {
 }
 
 // ── Render: Distancia ─────────────────────────────────────────────────────────
-function renderDist(newPfx,blockSize) {
-  const relOct=Math.ceil(newPfx/8);
-  const bitsEnOct=newPfx-(relOct-1)*8;
-  const maskOctVal=256-(1<<(8-bitsEnOct));
-  document.getElementById('dist-formula').innerHTML=
-    `Bloque = 256 − ${maskOctVal} = <strong style="color:var(--host)">${blockSize}</strong>`;
-  document.getElementById('dist-result').innerHTML=
-    `La nueva máscara <strong>/${newPfx}</strong> vale <strong>${maskOctVal}</strong> en el octeto ${relOct}.
-    Fórmula: 256 − ${maskOctVal} = <strong>${blockSize}</strong>.
-    Cada subred empieza <strong>${blockSize} posiciones</strong> después de la anterior
-    ${blockSize<=256?'en el octeto '+relOct:'(bloque abarca varios octetos)'}.`;
+function renderDist(newPfx, totalBlockSize) {
+  const relOct = Math.ceil(newPfx / 8);
+  const bitsEnOct = newPfx - (relOct - 1) * 8;
+  const maskOctVal = 256 - (1 << (8 - bitsEnOct));
+  const octetJump = 256 - maskOctVal;
+
+  document.getElementById('dist-formula').innerHTML =
+    `Salto = 256 − ${maskOctVal} = <strong style="color:var(--host)">${octetJump}</strong>`;
+
+  document.getElementById('dist-result').innerHTML =
+    `La nueva máscara <strong>/${newPfx}</strong> tiene valor <strong>${maskOctVal}</strong> en el octeto ${relOct}.
+    Por eso, el salto entre subredes en ese octeto es <strong>${octetJump}</strong>.
+    Cada subred ocupa en total <strong>${totalBlockSize}</strong> direcciones.`;
 }
 
 // ── Render: Octeto relevante ──────────────────────────────────────────────────
@@ -908,7 +910,7 @@ function calcular() {
   const hosts=(1<<(32-newPfx))-2;
   const origMaskInt=(0xFFFFFFFF<<(32-pfx))>>>0;
   const baseInt=(ipInt&origMaskInt)>>>0;
-  const blockSize=1<<(32-newPfx);
+  const totalBlockSize = 1 << (32 - newPfx);
 
   // FIX 2: avisar si la IP introducida no es dirección de red
   if(baseInt !== ipInt){
@@ -919,10 +921,10 @@ function calcular() {
   }
 
   renderRazon(nSub,sbits,numSub,hosts,newPfx,pfx);
-  renderDist(newPfx,blockSize);
-  renderOcteto(baseInt,newPfx,blockSize);
+  renderDist(newPfx,totalBlockSize);
+  renderOcteto(baseInt,newPfx,totalBlockSize);
   renderBits(baseInt,pfx,sbits);
-  renderInfo(pfx,sbits,numSub,hosts,newPfx,blockSize);
+  renderInfo(pfx,sbits,numSub,hosts,newPfx,totalBlockSize);
   renderTable(baseInt,pfx,sbits,numSub);
 
   SECS.forEach(id=>document.getElementById(id).classList.add('vis'));
